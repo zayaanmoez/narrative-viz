@@ -1,0 +1,25 @@
+{
+  "name": "narrative-viz",
+  "version": "1.0.0",
+  "description": "UIUC MCS CS416 Narritive Visualization Project",
+  "main": "index.js",
+  "dependencies": {
+    "d3-svg-annotation": "^2.5.1",
+    "http-server": "^14.1.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "http-server -c-1",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zayaanmoez/narrative-viz.git"
+  },
+  "author": "Zayaan Moez",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zayaanmoez/narrative-viz/issues"
+  },
+  "homepage": "https://github.com/zayaanmoez/narrative-viz#readme"
+}
