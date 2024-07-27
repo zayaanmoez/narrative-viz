@@ -144,6 +144,7 @@ function chartScene1() {
             .attr('y', d => y(d.avg_price))
             .attr('width', x.bandwidth())
             .attr('height', d => height - y(d.avg_price))
+            .attr('style', 'z-index: 100')
             .attr('fill', 'darkslategray');
 
         // Add tooltip to each bar
@@ -316,6 +317,7 @@ function renderScene2SVG(dataFiltered, width, height, margin, svg) {
         .attr('cx', d => x(d.property_sqft))
         .attr('cy', d => y(d.price))
         .attr('r', 3)
+        .attr('style', 'z-index: 100')
         .attr('fill', 'darkslategray');
 
     // Add tooltip to each bar
@@ -497,6 +499,7 @@ function renderScene3SVG(dataFiltered, width, height, margin, svg) {
         .attr('y', d => y(d.avg_price))
         .attr('width', x.bandwidth())
         .attr('height', d => height - y(d.avg_price))
+        .attr('style', 'z-index: 100')
         .attr('fill', 'darkslategray');
 
     // Add tooltip to each bar
