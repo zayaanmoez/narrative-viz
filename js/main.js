@@ -9,13 +9,13 @@ let scenes = [
     {
         id: 'scene2',
         title: 'Price and Square Footage across Boroughs',
-        content: 'A deeper look at trends in price and square footage across the boroughs of New York City.',
+        content: 'A deeper look at trends in price and square footage across the boroughs of New York City. Select a borough from dropdown below to view data for that borough.',
         renderChart: chartScene2
     },
     {
         id: 'scene3',
         title: 'Property Types in New York Metropolitan Area',
-        content: 'Exploring the different types of properties available in the New York Metropolitan Area.',
+        content: 'Exploring the different types of properties available in the New York Metropolitan Area. Select a borough from dropdown below to view data for that borough.',
         renderChart: chartScene3
     }
 ];
