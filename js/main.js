@@ -3,26 +3,20 @@ let scenes = [
     {
         id: 'scene1',
         title: 'Boroughs of New York Metropolitan Area',
-        content: 'A visualization of the average price of listings in each borough of New York City.',
+        content: 'Overview of the average price of listings in each borough of New York City.',
         renderChart: chartScene1
     },
     {
         id: 'scene2',
-        title: 'Scene 2',
-        content: 'This is the content of scene 2.',
+        title: 'Price and Square Footage across Boroughs',
+        content: 'A deeper look at trends in price and square footage across the boroughs of New York City.',
         renderChart: chartScene2
     },
     {
         id: 'scene3',
-        title: 'Scene 3',
-        content: 'This is the content of scene 3.',
+        title: 'Property Types in New York Metropolitan Area',
+        content: 'Exploring the different types of properties available in the New York Metropolitan Area.',
         renderChart: chartScene3
-    },
-    {
-        id: 'scene4',
-        title: 'Scene 4',
-        content: 'This is the content of scene 4.',
-        renderChart: chartScene4
     }
 ];
 
@@ -48,7 +42,7 @@ function renderScene(index) {
     content.classList.add('scene');
     content.id = scene.id;
     content.innerHTML = `
-        <h2>${scene.title}</h2>
+        <h3>${scene.title}</h3>
         <p>${scene.content}</p>
         <div class="scene-content"></div>
     `;
@@ -238,13 +232,331 @@ function chartScene1() {
 }
 
 function chartScene2() {
+    const container = document.getElementById(scenes[slideIndex].id).children[2];
+    const margin = {top: 100, right: 50, bottom: 100, left: 50};
+    const width = container.getBoundingClientRect().width - margin.left - margin.right;
+    const height = container.getBoundingClientRect().height - margin.top - margin.bottom;
 
+    // Make a dropdown for selecting boroughs mutli select
+    const select = d3.select('.scene-content').
+        append('select')
+        .attr('id', 'borough-select');
+
+    const svg = d3.select('.scene-content').
+        append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+    d3.csv('./data/NY-Housing-Dataset.csv').then(data => {
+        data.forEach(d => {
+            d.price = +d.price;
+            d.beds = +d.beds;
+            d.baths = +d.baths;
+            d.property_sqft = +d.propertysqft;
+            d.type = d.type.replace(' for sale', '');
+        });
+        
+        // List of boroughs
+        var boroughList = [...new Set(data.map(d => d.sublocality))];
+        var selectedBroughs = boroughList;
+        var dataFiltered = data.filter(d => (selectedBroughs.includes(d.sublocality) || selectedBroughs.includes(d.street_name)));
+
+        // Create dropdown for selecting boroughs with select all option
+        select.selectAll('option')
+            .data(['All'].concat(boroughList))
+            .enter()
+            .append('option')
+            .attr('value', d => d)
+            .text(d => d);
+
+        select.on('change', function() {
+            selectedBroughs = this.value === 'All' ? boroughList : [this.value];
+            dataFiltered = data.filter(d => (selectedBroughs.includes(d.sublocality) || selectedBroughs.includes(d.street_name)));
+            renderScene2SVG(dataFiltered, width, height, margin, svg);
+        });
+
+        renderScene2SVG(dataFiltered, width, height, margin, svg);
+    });
+}
+
+function renderScene2SVG(dataFiltered, width, height, margin, svg) {
+    svg.selectAll('*').remove();
+    var x = d3.scaleLog()
+        .domain([d3.min(dataFiltered, d => d.property_sqft), d3.max(dataFiltered, d => d.property_sqft)])
+        .range([0, width]);
+    var y = d3.scaleLog()
+        .domain([d3.min(dataFiltered, d => d.price), d3.max(dataFiltered, d => d.price)])
+        .range([height, 0]);
+
+    svg.append('g')
+        .attr('transform', `translate(0, ${height})`)
+        .call(d3.axisBottom(x))
+        .selectAll('text')
+        .attr('transform', 'rotate(-45)')
+        .style('text-anchor', 'end');
+    svg.append('g')
+        .call(d3.axisLeft(y));
+
+    // Add labels to axis
+    svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', `translate(${-margin.left + 10}, ${height / 2}) rotate(-90)`)
+        .text('Property Price');
+    svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', `translate(${width / 2}, ${height + margin.bottom - 50})`)
+        .text('Square Footage');
+
+    svg.selectAll('circle')
+        .data(dataFiltered)
+        .enter()
+        .append('circle')
+        .attr('cx', d => x(d.property_sqft))
+        .attr('cy', d => y(d.price))
+        .attr('r', 3)
+        .attr('fill', 'darkslategray');
+
+    // Add tooltip to each bar
+    var tooltip = d3.select('body')
+        .append('div')
+        .style('position', 'absolute')
+        .style('background', 'white')
+        .style('padding', '5px')
+        .style('border', '1px solid black')
+        .style('border-radius', '5px')
+        .style('opacity', 0);
+
+    svg.selectAll('circle')
+        .on('mouseover', function(event, d) {
+            d3.select(this)
+                .attr('fill', 'steelblue');
+            tooltip.transition()
+                .style('opacity', 1);
+            tooltip.html(`Borough: ${d.sublocality}
+                <br>Price: $${d.price}
+                <br>Sqft: ${d.property_sqft}
+                <br>Beds: ${d.beds}
+                <br>Baths: ${d.bath}
+                <br>Type: ${d.type}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY + 10) + 'px');
+        })
+        .on('mouseout', function(event, d) {
+            d3.select(this)
+                .attr('fill', 'darkslategray');
+            tooltip.transition()
+                .style('opacity', 0);
+        });
+
+    // Find the most popular square footage to 4 significant figures
+    const sqft = d3.group(dataFiltered, d => Math.round(d.property_sqft));
+    const countSqft = Array.from(sqft, ([key, value]) => ({sqft: key, count: value.length}));
+    const pSqftValue = d3.max(countSqft, d => d.count);
+    const pSqftData = countSqft.find(d => d.count === pSqftValue);
+    var selectedBorough = document.getElementById('borough-select').value === 'All' ? 'New York Metropolitan Area' : document.getElementById('borough-select').value;
+
+    // Find the y range for values with pSqftData.sqft
+    var values = dataFiltered.filter(d => Math.round(d.property_sqft) === pSqftData.sqft);
+    var yMin = d3.min(values, d => parseInt(d.price));
+    var yMax = d3.max(values, d => parseInt(d.price));
+    
+    // Add annotations to chart
+    const annotations = [
+        {
+            note: {
+                label: `${pSqftData.sqft} sqft is the most common property size in the ${selectedBorough} with ${pSqftData.count} listings`,
+                title: 'Common Property Size',
+                wrap: 400
+            },
+            data: {sqft: pSqftData.sqft, count: pSqftData.count},
+            x: x(pSqftData.sqft) - 10,
+            y: y(yMin) + 10,
+            dy: y(yMax) - y(yMin) - 30,
+            dx: 70,
+            subject: {
+                width: 20,
+                height: y(yMax) - y(yMin) - 20
+            },
+        }
+    ];
+
+    const makeAnnotations = d3.annotation()
+        .type(d3.annotationLabel)
+        .annotations(annotations)
+        .type(d3.annotationCalloutRect);
+
+    svg.append('g')
+        .attr('class', 'annotation-group')
+        .call(makeAnnotations);
 }
 
 function chartScene3() {
+    const container = document.getElementById(scenes[slideIndex].id).children[2];
+    const margin = {top: 100, right: 50, bottom: 100, left: 50};
+    const width = container.getBoundingClientRect().width - margin.left - margin.right;
+    const height = container.getBoundingClientRect().height - margin.top - margin.bottom;
 
+    // Make a dropdown for selecting boroughs mutli select
+    const select = d3.select('.scene-content').
+        append('select')
+        .attr('id', 'borough-select');
+
+    const svg = d3.select('.scene-content').
+        append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+    d3.csv('./data/NY-Housing-Dataset.csv').then(data => {
+        data.forEach(d => {
+            d.price = parseFloat(d.price);
+            d.beds = parseInt(d.beds);
+            d.baths = parseInt(d.baths);
+            d.propertysqft = parseFloat(d.propertysqft);
+            d.price_per_sqft = parseFloat(d.price / d.propertysqft);
+            d.type = d.type.replace(' for sale', '');
+        });
+        
+        // List of boroughs
+        var boroughList = [...new Set(data.map(d => d.sublocality))];
+        var selectedBroughs = boroughList;
+        var dataFiltered = data.filter(d => (selectedBroughs.includes(d.sublocality) || selectedBroughs.includes(d.street_name)));
+
+        // Create dropdown for selecting boroughs with select all option
+        select.selectAll('option')
+            .data(['All'].concat(boroughList))
+            .enter()
+            .append('option')
+            .attr('value', d => d)
+            .text(d => d);
+
+        select.on('change', function() {
+            selectedBroughs = this.value === 'All' ? boroughList : [this.value];
+            dataFiltered = data.filter(d => (selectedBroughs.includes(d.sublocality) || selectedBroughs.includes(d.street_name)));
+            renderScene3SVG(dataFiltered, width, height, margin, svg);
+        });
+
+        renderScene3SVG(dataFiltered, width, height, margin, svg);
+    });
 }
 
-function chartScene4() {
-    
+function renderScene3SVG(dataFiltered, width, height, margin, svg) {
+    svg.selectAll('*').remove();
+    // List of property types
+    var propertyTypes = [...new Set(dataFiltered.map(d => d.type))];
+
+    // Type data
+    var propertyTypeData = d3.group(dataFiltered, d => d.type);
+    var propertyTypeData = Array.from(propertyTypeData, ([key, value]) => (
+        {
+            type: key,
+            avg_price: d3.mean(value, d => d.price).toFixed(2),
+            avg_sqft: d3.mean(value, d => d.propertysqft).toFixed(2),
+            avg_price_per_sqft: d3.mean(value, d => d.price_per_sqft).toFixed(2),
+            avg_beds: Math.round(d3.mean(value, d => d.beds)),
+            avg_baths: Math.round(d3.mean(value, d => d.bath)),
+            count: value.length
+        }
+    ));
+
+    var x = d3.scaleBand()
+        .domain(propertyTypeData.map(d => d.type))
+        .range([0, width])
+        .padding(0.1);
+    var y = d3.scaleLog()
+        .domain([100000, 15000000])
+        .range([height, 0]);
+
+    svg.append('g')
+        .attr('transform', `translate(0, ${height})`)
+        .call(d3.axisBottom(x))
+        .selectAll('text')
+        .attr('transform', 'rotate(-45)')
+        .style('text-anchor', 'end');
+    svg.append('g')
+        .call(d3.axisLeft(y));
+
+    // Add labels to axis
+    svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', `translate(${-margin.left + 10}, ${height / 2}) rotate(-90)`)
+        .text('Average Price');
+    svg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('transform', `translate(${width / 2}, ${height + margin.bottom - 25})`)
+        .text('Property Type');
+
+    svg.selectAll('rect')
+        .data(propertyTypeData)
+        .enter()
+        .append('rect')
+        .attr('x', d => x(d.type))
+        .attr('y', d => y(d.avg_price))
+        .attr('width', x.bandwidth())
+        .attr('height', d => height - y(d.avg_price))
+        .attr('fill', 'darkslategray');
+
+    // Add tooltip to each bar
+    var tooltip = d3.select('body')
+        .append('div')
+        .style('position', 'absolute')
+        .style('background', 'white')
+        .style('padding', '5px')
+        .style('border', '1px solid black')
+        .style('border-radius', '5px')
+        .style('opacity', 0);
+
+    svg.selectAll('rect')
+        .on('mouseover', function(event, d) {
+            d3.select(this)
+                .attr('fill', 'steelblue');
+            tooltip.transition()
+                .style('opacity', 1);
+            tooltip.html(`Avg Price: $${d.avg_price}
+                <br>Avg Sqft: ${d.avg_sqft}
+                <br>Avg Price/Sqft: $${d.avg_price_per_sqft}
+                <br>Avg Beds: ${d.avg_beds}
+                <br>Avg Baths: ${d.avg_baths}
+                <br>Count: ${d.count}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY + 10) + 'px');
+        })
+        .on('mouseout', function(event, d) {
+            d3.select(this)
+                .attr('fill', 'darkslategray');
+            tooltip.transition()
+                .style('opacity', 0);
+        });
+
+    var maxPrice = d3.max(propertyTypeData, d => parseFloat(d.avg_price));
+    var maxPriceType = propertyTypeData.find(d => parseFloat(d.avg_price) === maxPrice);
+    var selectedBorough = document.getElementById('borough-select').value === 'All' ? 'New York Metropolitan Area' : document.getElementById('borough-select').value;
+
+
+    // Add annotations to chart
+    const annotations = [
+        {
+            note: {
+                label: `${maxPriceType.type} has the highest average price of $${parseInt(maxPriceType.avg_price)} in the ${selectedBorough}`,
+                wrap: 300
+            },
+            data: {type: maxPriceType.type, avg_price: maxPriceType.avg_price, avg_sqft: maxPriceType.avg_sqft},
+            x: x(maxPriceType.type) + x.bandwidth() / 2,
+            y: y(maxPrice),
+            dy: -30,
+            dx: 0,
+        },
+    ];
+
+    const makeAnnotations = d3.annotation()
+        .type(d3.annotationLabel)
+        .annotations(annotations)
+        .type(d3.annotationCallout);
+
+    svg.append('g')
+        .attr('class', 'annotation-group')
+        .call(makeAnnotations);
 }
